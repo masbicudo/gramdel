@@ -1,5 +1,5 @@
-gramdel (Grammar Definition Language)
-=====================================
+Grammar Definition Language
+===========================
 
 This is a language that can be used to define the formal grammar for other languages.
 
