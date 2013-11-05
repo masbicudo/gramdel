@@ -1,0 +1,2 @@
+﻿rule Main -> A;
+rule A -> A 'a' | 'a' | A 'b' | 'b';
