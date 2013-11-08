@@ -19,7 +19,7 @@ namespace Gramdel.Core
                     // If there are no more rules, then we signal the production of a new Gramdel file.
                     if (ruleNode == null)
                     {
-                        ctx.ItemProduced(this.Gramdel, 0, prod.Origin, gramdelNode);
+                        prod.ItemProduced(0, ctx, gramdelNode);
                     }
                     else
                     {
@@ -72,19 +72,18 @@ namespace Gramdel.Core
                     }
                     else if (operands.Count > 1)
                     {
-                        ctx.ItemProduced<ExpressionNode>(this.Alternation, ALT_0, prod.Origin,
-                                         new AlternationNode { Operands = operands.ToArray() });
-                        ctx.ProductionFailed(this.Alternation, prod.Origin, ALT_1);
+                        prod.ItemProduced<ExpressionNode>(ALT_0, ctx, new AlternationNode { Operands = operands.ToArray() });
+                        prod.ProductionFailed(ALT_1, ctx);
                     }
                     else if (operands.Count == 1)
                     {
-                        ctx.ProductionFailed(this.Alternation, prod.Origin, ALT_0);
-                        ctx.ItemProduced(this.Alternation, ALT_1, prod.Origin, node);
+                        prod.ProductionFailed(ALT_0, ctx);
+                        prod.ItemProduced(ALT_1, ctx, node);
                     }
                     else
                     {
-                        ctx.ProductionFailed(this.Alternation, prod.Origin, ALT_0);
-                        ctx.ProductionFailed(this.Alternation, prod.Origin, ALT_1);
+                        prod.ProductionFailed(ALT_0, ctx);
+                        prod.ProductionFailed(ALT_1, ctx);
                     }
                 };
                 productionConcat.ContinueWith(cont1);
@@ -125,19 +124,18 @@ namespace Gramdel.Core
                     }
                     else if (operands.Count > 1)
                     {
-                        ctx.ItemProduced<ExpressionNode>(this.Concatenation, ALT_0, origin,
-                                         new ConcatenationNode { Operands = operands.ToArray() });
-                        ctx.ProductionFailed(this.Concatenation, origin, ALT_1);
+                        prod.ItemProduced<ExpressionNode>(ALT_0, ctx, new ConcatenationNode { Operands = operands.ToArray() });
+                        prod.ProductionFailed(ALT_1, ctx);
                     }
                     else if (operands.Count == 1)
                     {
-                        ctx.ProductionFailed(this.Concatenation, origin, ALT_0);
-                        ctx.ItemProduced(this.Concatenation, ALT_1, origin, node);
+                        prod.ProductionFailed(ALT_0, ctx);
+                        prod.ItemProduced(ALT_1, ctx, node);
                     }
                     else
                     {
-                        ctx.ProductionFailed(this.Concatenation, origin, ALT_0);
-                        ctx.ProductionFailed(this.Concatenation, origin, ALT_1);
+                        prod.ProductionFailed(ALT_0, ctx);
+                        prod.ProductionFailed(ALT_1, ctx);
                     }
                 };
                 prodExpr1.ContinueWith(cont1);
@@ -149,8 +147,6 @@ namespace Gramdel.Core
         {
             var prod = context.GetOrCreateProduction(this.ExpressionTerm);
 
-            var origin = context.Position;
-
             prod.SetAlternativeProductsCapacity(2);
             const int ALT_TOKEN = 0;
             const int ALT_NAME = 1;
@@ -159,7 +155,7 @@ namespace Gramdel.Core
 
             // trying to read a token
             {
-                context.Position = origin;
+                context.Position = prod.Origin;
 
                 if (context.Reader.TryReadToken(context.Code, context.Position, "'"))
                 {
@@ -181,8 +177,7 @@ namespace Gramdel.Core
                     if (context.Reader.TryReadToken(context.Code, context.Position, "'"))
                     {
                         context.Position++;
-                        context.ItemProduced<ExpressionNode>(this.ExpressionTerm, ALT_TOKEN, origin,
-                                             new TokenNode { Token = b.ToString() });
+                        prod.ItemProduced<ExpressionNode>(ALT_TOKEN, context, new TokenNode { Token = b.ToString() });
                     }
                     else
                         isAltTokenFailed = true;
@@ -191,31 +186,31 @@ namespace Gramdel.Core
                     isAltTokenFailed = true;
 
                 if (isAltTokenFailed)
-                    context.ProductionFailed(this.ExpressionTerm, origin, ALT_TOKEN);
+                    prod.ProductionFailed(ALT_TOKEN, context);
             }
 
             // trying to read a name
             {
-                context.Position = origin;
+                context.Position = prod.Origin;
 
                 var name = context.Reader.ReadText(context.Code, context.Position, c => char.IsLetterOrDigit(c));
                 if (name.Length > 0)
                 {
                     context.Position += name.Length;
-                    context.ItemProduced<ExpressionNode>(this.ExpressionTerm, ALT_NAME, origin, new RuleReferenceNode { RuleName = name });
+                    prod.ItemProduced<ExpressionNode>(ALT_NAME, context, new RuleReferenceNode { RuleName = name });
                 }
                 else
                 {
-                    context.ProductionFailed(this.ExpressionTerm, origin, ALT_NAME);
+                    prod.ProductionFailed(ALT_NAME, context);
                 }
             }
         }
 
         public void Rule(ParsingLocalContext context)
         {
-            var ruleNode = new RuleNode();
+            var prod = context.GetOrCreateProduction(this.Rule);
 
-            var origin = context.Position;
+            var ruleNode = new RuleNode();
 
             context.Position += context.Reader.SkipSpaces(context.Code, context.Position);
             if (context.Reader.TryReadToken(context.Code, context.Position, "rule"))
@@ -245,7 +240,7 @@ namespace Gramdel.Core
                                 {
                                     ctx.Position++;
                                     ruleNode.Expression = expressionNode;
-                                    ctx.ItemProduced(this.Rule, 0, origin, ruleNode);
+                                    prod.ItemProduced(0, context, ruleNode);
                                 }
                             });
                         prodAlt.Execute(context);

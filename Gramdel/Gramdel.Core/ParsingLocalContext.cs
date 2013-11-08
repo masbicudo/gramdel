@@ -81,29 +81,5 @@ namespace Gramdel.Core
         {
             return this.GlobalContext.GetProduction(action, this.Position);
         }
-
-        /// <summary>
-        /// Indicated that a product has been produced, by the use of a parsing method (also called producer).
-        /// </summary>
-        /// <typeparam name="TNode">Type of the produced object.</typeparam>
-        /// <param name="action">Action representing the producer, that is the parsing method.</param>
-        /// <param name="alternative">Indicates the alternative slot in which to place the product.</param>
-        /// <param name="origin">Product origin in the source code.</param>
-        /// <param name="node">Produced object.</param>
-        public void ItemProduced<TNode>(ReaderAction action, int alternative, int origin, TNode node)
-        {
-            this.GlobalContext.ItemProduced(action, origin, alternative, this, node);
-        }
-
-        /// <summary>
-        /// Indicates that an alternative has failed, and that no product should be expected.
-        /// </summary>
-        /// <param name="action"> The action. </param>
-        /// <param name="origin">Production origin in the source code.</param>
-        /// <param name="alternative"> The alternative number. </param>
-        public void ProductionFailed(ReaderAction action, int origin, int alternative)
-        {
-            this.GlobalContext.ProductionFailed(action, origin, alternative, this);
-        }
     }
 }
