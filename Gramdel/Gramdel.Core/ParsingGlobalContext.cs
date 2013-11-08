@@ -19,7 +19,6 @@ namespace Gramdel.Core
 
         public string Code { get; set; }
 
-
         static class PositionalKey
         {
             public static PositionalKey<TKey> Create<TKey>(int position, TKey key)
@@ -42,59 +41,29 @@ namespace Gramdel.Core
             }
         }
 
-        class WaiterDictionary : Dictionary<PositionalKey<ReaderAction>, Waiter>
+        class ProductionDictionary : Dictionary<PositionalKey<ReaderAction>, ProductionContext>
         {
-            public WaiterDictionary()
+            public ProductionDictionary()
                 : base(new PositionalKeyComparer<ReaderAction>())
             {
             }
         }
 
-        WaiterDictionary waiters = new WaiterDictionary();
+        ProductionDictionary productions = new ProductionDictionary();
 
-        public Waiter WaitFor(ReaderAction action, int position)
+        public ProductionContext GetProduction(ReaderAction action, int position)
         {
             var posKey = PositionalKey.Create(position, action);
-            Waiter waiter;
-            if (!this.waiters.TryGetValue(posKey, out waiter))
+            ProductionContext productionContext;
+            if (!this.productions.TryGetValue(posKey, out productionContext))
             {
-                waiter = new Waiter(posKey);
-                waiters.Add(posKey, waiter);
+                productionContext = new ProductionContext(posKey);
+                productions.Add(posKey, productionContext);
             }
 
-            return waiter;
-        }
-
-        public void ItemProduced<TNode>(ReaderAction action, int origin, int alternative, ParsingLocalContext context, TNode product)
-        {
-            var posKey = PositionalKey.Create(origin, action);
-            Waiter waiter;
-            if (this.waiters.TryGetValue(posKey, out waiter))
-            {
-                waiter.ExecuteContinuations(product, context);
-            }
+            return productionContext;
         }
 
         public PosData[] PositionalData { get; set; }
-
-        class ExecutorSet : HashSet<PositionalKey<ReaderAction>>
-        {
-            public ExecutorSet()
-                : base(new PositionalKeyComparer<ReaderAction>())
-            {
-            }
-        }
-
-        ExecutorSet executors = new ExecutorSet();
-
-        public void Execute(ReaderAction action, ParsingLocalContext context)
-        {
-            var posKey = PositionalKey.Create(context.Position, action);
-            if (!executors.Contains(posKey))
-            {
-                executors.Add(posKey);
-                action(context);
-            }
-        }
     }
 }

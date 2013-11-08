@@ -1,62 +1,60 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Text;
 
 namespace Gramdel.Core
 {
     public class GramdelParser
     {
-        public ParsingGlobalContext CreateGlobalContext(string code)
-        {
-            var result = new ParsingGlobalContext(code);
-            return result;
-        }
-
         public void Gramdel(ParsingLocalContext context)
         {
+            var prod = context.GetOrCreateProduction(this.Gramdel);
+
             var gramdelNode = new GramdelNode();
 
-            var origin = context.Position;
-
             // waiting for the first rule
-            var waiter = context.WaitFor(this.Rule);
-            Waiter.Continuation<RuleNode> ruleProcessor = null;
+            var prodRule = context.GetOrCreateProduction(this.Rule);
+            SuccessContinuation<RuleNode> ruleProcessor = null;
             ruleProcessor = (ruleNode, ctx) =>
                 {
                     // If there are no more rules, then we signal the production of a new Gramdel file.
                     if (ruleNode == null)
                     {
-                        ctx.ItemProduced(this.Gramdel, 0, origin, gramdelNode);
+                        ctx.ItemProduced(this.Gramdel, 0, prod.Origin, gramdelNode);
                     }
                     else
                     {
                         gramdelNode.Rules.Add(ruleNode);
 
                         // waiting for another rule
-                        var waiter2 = ctx.WaitFor(this.Rule);
-                        waiter2.ContinueWith(ruleProcessor);
-                        ctx.Execute(this.Rule);
+                        var prodRule2 = ctx.GetOrCreateProduction(this.Rule);
+                        prodRule2.ContinueWith(ruleProcessor);
+                        prodRule2.Execute(ctx);
                     }
                 };
-            waiter.ContinueWith(ruleProcessor);
-            context.Execute(this.Rule);
+            prodRule.ContinueWith(ruleProcessor);
+            prodRule.Execute(context);
         }
 
         private void Alternation(ParsingLocalContext context)
         {
-            var origin = context.Position;
+            var prod = context.GetOrCreateProduction(this.Alternation);
 
-            context.Position = origin;
+            context.Position = prod.Origin;
 
             // Sets the number of alternatives that can be produced by this producer method.
-            context.SetAlternativesCount(this.Alternation, 2);
+            prod.SetAlternativeProductsCapacity(2);
             const int ALT_0 = 0;
             const int ALT_1 = 1;
 
             {
                 var operands = new List<ExpressionNode>();
-                var waiter1 = context.WaitFor(this.Concatenation);
-                Waiter.Continuation<ExpressionNode> cont1 = null;
+                var productionConcat = context.GetOrCreateProduction(this.Concatenation);
+                FailureContinuation fail = ctx =>
+                    {
+
+                    };
+                productionConcat.FailWith(fail);
+                SuccessContinuation<ExpressionNode> cont1 = null;
                 cont1 = (node, ctx) =>
                 {
                     operands.Add(node);
@@ -68,47 +66,49 @@ namespace Gramdel.Core
                         ctx.Position += ctx.Reader.SkipSpaces(ctx.Code, ctx.Position);
 
                         // reading the second operator of the alternation
-                        var waiter2 = context.WaitFor(this.Concatenation);
-                        waiter2.ContinueWith(cont1);
-                        ctx.Execute(this.Concatenation);
+                        var productionConcat2 = context.GetOrCreateProduction(this.Concatenation);
+                        productionConcat2.ContinueWith(cont1);
+                        productionConcat2.Execute(ctx);
                     }
                     else if (operands.Count > 1)
                     {
-                        ctx.ItemProduced<ExpressionNode>(this.Alternation, ALT_0, origin,
+                        ctx.ItemProduced<ExpressionNode>(this.Alternation, ALT_0, prod.Origin,
                                          new AlternationNode { Operands = operands.ToArray() });
-                        ctx.Fail(this.Alternation, ALT_1);
+                        ctx.ProductionFailed(this.Alternation, prod.Origin, ALT_1);
                     }
                     else if (operands.Count == 1)
                     {
-                        ctx.Fail(this.Alternation, ALT_0);
-                        ctx.ItemProduced(this.Alternation, ALT_1, origin, node);
+                        ctx.ProductionFailed(this.Alternation, prod.Origin, ALT_0);
+                        ctx.ItemProduced(this.Alternation, ALT_1, prod.Origin, node);
                     }
                     else
                     {
-                        ctx.Fail(this.Alternation, ALT_0);
-                        ctx.Fail(this.Alternation, ALT_1);
+                        ctx.ProductionFailed(this.Alternation, prod.Origin, ALT_0);
+                        ctx.ProductionFailed(this.Alternation, prod.Origin, ALT_1);
                     }
                 };
-                waiter1.ContinueWith(cont1);
-                context.Execute(this.Concatenation);
+                productionConcat.ContinueWith(cont1);
+                productionConcat.Execute(context);
             }
         }
 
         private void Concatenation(ParsingLocalContext context)
         {
+            var prod = context.GetOrCreateProduction(this.Concatenation);
+
             var origin = context.Position;
 
             context.Position = origin;
 
             // Sets the number of alternatives that can be produced by this producer method.
-            context.SetAlternativesCount(this.Concatenation, 2);
+            prod.SetAlternativeProductsCapacity(2);
             const int ALT_0 = 0;
             const int ALT_1 = 1;
 
             {
                 var operands = new List<ExpressionNode>();
-                var waiter1 = context.WaitFor(this.ExpressionTerm);
-                Waiter.Continuation<ExpressionNode> cont1 = null;
+                var prodExpr1 = context.GetOrCreateProduction(this.ExpressionTerm);
+                SuccessContinuation<ExpressionNode> cont1 = null;
                 cont1 = (node, ctx) =>
                 {
                     operands.Add(node);
@@ -119,37 +119,39 @@ namespace Gramdel.Core
                         ctx.Position += spaces;
 
                         // reading the second operator of the alternation
-                        var waiter2 = ctx.WaitFor(this.ExpressionTerm);
-                        waiter2.ContinueWith(cont1);
-                        ctx.Execute(this.ExpressionTerm);
+                        var prodExpr2 = ctx.GetOrCreateProduction(this.ExpressionTerm);
+                        prodExpr2.ContinueWith(cont1);
+                        prodExpr2.Execute(ctx);
                     }
                     else if (operands.Count > 1)
                     {
                         ctx.ItemProduced<ExpressionNode>(this.Concatenation, ALT_0, origin,
                                          new ConcatenationNode { Operands = operands.ToArray() });
-                        ctx.Fail(this.Concatenation, ALT_1);
+                        ctx.ProductionFailed(this.Concatenation, origin, ALT_1);
                     }
                     else if (operands.Count == 1)
                     {
-                        ctx.Fail(this.Concatenation, ALT_0);
+                        ctx.ProductionFailed(this.Concatenation, origin, ALT_0);
                         ctx.ItemProduced(this.Concatenation, ALT_1, origin, node);
                     }
                     else
                     {
-                        ctx.Fail(this.Concatenation, ALT_0);
-                        ctx.Fail(this.Concatenation, ALT_1);
+                        ctx.ProductionFailed(this.Concatenation, origin, ALT_0);
+                        ctx.ProductionFailed(this.Concatenation, origin, ALT_1);
                     }
                 };
-                waiter1.ContinueWith(cont1);
-                context.Execute(this.ExpressionTerm);
+                prodExpr1.ContinueWith(cont1);
+                prodExpr1.Execute(context);
             }
         }
 
         private void ExpressionTerm(ParsingLocalContext context)
         {
+            var prod = context.GetOrCreateProduction(this.ExpressionTerm);
+
             var origin = context.Position;
 
-            context.SetAlternativesCount(this.ExpressionTerm, 2);
+            prod.SetAlternativeProductsCapacity(2);
             const int ALT_TOKEN = 0;
             const int ALT_NAME = 1;
 
@@ -189,7 +191,7 @@ namespace Gramdel.Core
                     isAltTokenFailed = true;
 
                 if (isAltTokenFailed)
-                    context.Fail(this.ExpressionTerm, ALT_TOKEN);
+                    context.ProductionFailed(this.ExpressionTerm, origin, ALT_TOKEN);
             }
 
             // trying to read a name
@@ -204,7 +206,7 @@ namespace Gramdel.Core
                 }
                 else
                 {
-                    context.Fail(this.ExpressionTerm, ALT_NAME);
+                    context.ProductionFailed(this.ExpressionTerm, origin, ALT_NAME);
                 }
             }
         }
@@ -234,8 +236,8 @@ namespace Gramdel.Core
                         context.Position += 2;
                         context.Position += context.Reader.SkipSpaces(context.Code, context.Position);
 
-                        var waiter = context.WaitFor(this.Alternation);
-                        waiter.ContinueWith<ExpressionNode>((expressionNode, ctx) =>
+                        var prodAlt = context.GetOrCreateProduction(this.Alternation);
+                        prodAlt.ContinueWith<ExpressionNode>((expressionNode, ctx) =>
                             {
                                 ctx.Position += ctx.Reader.SkipSpaces(ctx.Code, ctx.Position);
 
@@ -246,7 +248,7 @@ namespace Gramdel.Core
                                     ctx.ItemProduced(this.Rule, 0, origin, ruleNode);
                                 }
                             });
-                        context.Execute(this.Alternation);
+                        prodAlt.Execute(context);
                     }
                 }
             }

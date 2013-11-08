@@ -11,11 +11,11 @@ namespace Gramdel.Sample
 rule Main -> A;
 rule A -> A 'a' | 'a' | A 'b' | 'b';
 ";
-            var context = new ParsingLocalContext(parser.CreateGlobalContext(code), 0, new TextReader());
+            var context = new ParsingLocalContext(new ParsingGlobalContext(code), 0, new TextReader());
 
-            var waiter = context.WaitFor(parser.Gramdel);
-            waiter.ContinueWith<GramdelParser.GramdelNode>((node, ctx) => output.Message(node));
-            context.Execute(parser.Gramdel);
+            var prod = context.GetOrCreateProduction(parser.Gramdel);
+            prod.ContinueWith<GramdelParser.GramdelNode>((node, ctx) => output.Message(node));
+            prod.Execute(context);
 
             return 0;
         }

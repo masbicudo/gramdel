@@ -39,16 +39,19 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Continuation.cs" />
     <Compile Include="GramdelParser.cs" />
     <Compile Include="GramdelNode.cs" />
     <Compile Include="PositionalKey.cs" />
+    <Compile Include="ProdcutAlternative.cs" />
+    <Compile Include="ProductAlternativeState.cs" />
     <Compile Include="ReaderAction.cs" />
     <Compile Include="ParsingGlobalContext.cs" />
     <Compile Include="ParsingLocalContext.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="TextReader.cs" />
     <Compile Include="TypeDictionary.cs" />
-    <Compile Include="Waiter.cs" />
+    <Compile Include="ProductionContext.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

@@ -76,10 +76,10 @@ namespace Gramdel.Core
         /// Waits for a parsing product in the current position of the source code.
         /// </summary>
         /// <param name="action">Action representing the producer, that is the parsing method.</param>
-        /// <returns>Waiter object that can be used to create continuations of the parsing process.</returns>
-        public Waiter WaitFor(ReaderAction action)
+        /// <returns>ProductionContext object that can be used to create continuations of the parsing process.</returns>
+        public ProductionContext GetOrCreateProduction(ReaderAction action)
         {
-            return this.GlobalContext.WaitFor(action, this.Position);
+            return this.GlobalContext.GetProduction(action, this.Position);
         }
 
         /// <summary>
@@ -96,26 +96,14 @@ namespace Gramdel.Core
         }
 
         /// <summary>
-        /// Ensures the execution of a parsing method (also known as producer)
-        /// at the current position in the source code.
-        /// </summary>
-        /// <param name="action">Action representing the producer, that is the parsing method.</param>
-        public void Execute(ReaderAction action)
-        {
-            this.GlobalContext.Execute(action, this);
-        }
-
-        /// <summary>
-        /// Indicates that an alternative has failed.
+        /// Indicates that an alternative has failed, and that no product should be expected.
         /// </summary>
         /// <param name="action"> The action. </param>
+        /// <param name="origin">Production origin in the source code.</param>
         /// <param name="alternative"> The alternative number. </param>
-        public void Fail(ReaderAction action, int alternative)
+        public void ProductionFailed(ReaderAction action, int origin, int alternative)
         {
-        }
-
-        public void SetAlternativesCount(ReaderAction action, int p)
-        {
+            this.GlobalContext.ProductionFailed(action, origin, alternative, this);
         }
     }
 }
