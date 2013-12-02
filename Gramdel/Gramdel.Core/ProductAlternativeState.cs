@@ -19,5 +19,10 @@ namespace Gramdel.Core
         /// Indicates an alternative that has failed, and as such will not have a product.
         /// </summary>
         Failed,
+
+        /// <summary>
+        /// Indicates an alternative slot that has been subdivided to accommodate more alternatives.
+        /// </summary>
+        Expanded,
     }
 }

@@ -31,7 +31,7 @@ namespace Gramdel.Core
         /// <param name="globalContext"> The global parsing context. </param>
         /// <param name="position"> Current parsing position inside the source code. </param>
         /// <param name="reader"> The text reader used to read the code. </param>
-        public ParsingLocalContext(ParsingGlobalContext globalContext, int position, TextReader reader)
+        public ParsingLocalContext( ParsingGlobalContext globalContext, int position, TextReader reader)
         {
             this.globalContext = globalContext;
             this.Position = position;

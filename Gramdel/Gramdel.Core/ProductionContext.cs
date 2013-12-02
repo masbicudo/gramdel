@@ -14,10 +14,11 @@ namespace Gramdel.Core
         private PositionalKey<ReaderAction> positionalKey;
         private readonly List<object> successContinuations = new List<object>();
         private readonly List<FailureContinuation> failureContinuations = new List<FailureContinuation>();
-        private bool isClosed;
+        private ProductionState state;
         private ProductAlternative[] alternatives;
         private int successCount;
         private int failureCount;
+        private int capacity;
 
         internal ProductionContext(PositionalKey<ReaderAction> posKey)
         {
@@ -59,17 +60,15 @@ namespace Gramdel.Core
             this.failureContinuations.Add(action);
         }
 
-        private bool executed;
-
         /// <summary>
         /// Ensures the execution of the parsing method (also known as producer) at the position of this production.
         /// </summary>
         /// <param name="context"></param>
         public void Execute(ParsingLocalContext context)
         {
-            if (!this.executed)
+            if (this.state == ProductionState.Created)
             {
-                this.executed = true;
+                this.state = ProductionState.Started;
                 this.Action(context);
             }
         }
@@ -87,8 +86,6 @@ namespace Gramdel.Core
             }
         }
 
-        private int capacity;
-
         /// <summary>
         /// Gets or sets the number of alternatives that this production can produce.
         /// </summary>
@@ -99,10 +96,15 @@ namespace Gramdel.Core
 
         public void SetAlternativeProductsCapacity(int value)
         {
+            if (value <= 0)
+                throw new Exception("Must set the capacity to a value greater than zero.");
+
             if (value < this.capacity)
                 throw new Exception("Cannot decrease the capacity.");
 
             this.capacity = value;
+
+            this.alternatives = this.alternatives ?? new ProductAlternative[Math.Max(4, value)];
 
             if (value > this.alternatives.Length)
                 Array.Resize(ref this.alternatives, this.alternatives.Length * 2);
@@ -129,7 +131,7 @@ namespace Gramdel.Core
         /// </summary>
         public bool IsClosed
         {
-            get { return this.isClosed; }
+            get { return this.state == ProductionState.Closed; }
         }
 
         /// <summary>
@@ -139,10 +141,10 @@ namespace Gramdel.Core
         /// <param name="context"></param>
         public void CloseProduction(ParsingLocalContext context)
         {
-            if (this.isClosed)
+            if (this.IsClosed)
                 throw new Exception("Production is already closed.");
 
-            this.isClosed = true;
+            this.state = ProductionState.Closed;
             Array.Resize(ref this.alternatives, this.capacity);
 
             context.Position = this.Origin;
@@ -170,11 +172,11 @@ namespace Gramdel.Core
             get { return this.alternatives.ToArray(); }
         }
 
-        public bool TryGetAlternative(int alternative, out object product)
+        public bool TryGetAlternative(int alternativeIndex, out object product)
         {
-            if (this.alternatives[alternative].State == ProductAlternativeState.Succeded)
+            if (this.alternatives[alternativeIndex].State == ProductAlternativeState.Succeded)
             {
-                product = this.alternatives[alternative].Product;
+                product = this.alternatives[alternativeIndex].Product;
                 return true;
             }
 
@@ -183,49 +185,92 @@ namespace Gramdel.Core
         }
 
         /// <summary>
-        /// Indicates that an alternative product has been produced by this producer method.
+        /// Indicates that an alternative product has been produced by a producer method.
         /// </summary>
         /// <typeparam name="TNode">Type of the produced object.</typeparam>
-        /// <param name="alternative">Alternative ID that must be filled with this product.</param>
+        /// <param name="key">Alternative key indicating the alternative slot to be filled by the given product.</param>
         /// <param name="context">Execution context for the continuations of the succeded alternative.</param>
         /// <param name="product">Product produced by the parsing method (the producer).</param>
-        public void ItemProduced<TNode>(int alternative, ParsingLocalContext context, TNode product)
+        public void ItemProduced<TNode>(AlternativeKey key, ParsingLocalContext context, TNode product)
         {
-            if (this.isClosed)
+            if (this.IsClosed)
                 throw new Exception("Production is closed.");
 
-            this.successCount++;
-            this.alternatives[alternative].State = ProductAlternativeState.Succeded;
-            this.alternatives[alternative].Product = product;
+            for (int it = 0; it < key.Length; it++)
+            {
+                
+            }
 
-            this.ExecuteContinuations(product, context);
+            this.successCount++;
+            this.alternatives[key[0]].State = ProductAlternativeState.Succeded;
+            this.alternatives[key[0]].Product = product;
+
+            this.ExecuteContinuations(key, product, context);
         }
 
         /// <summary>
         /// Executes all continuations for a given product.
         /// </summary>
         /// <typeparam name="TNode"></typeparam>
+        /// <param name="key"> </param>
         /// <param name="product"></param>
         /// <param name="context"></param>
-        private void ExecuteContinuations<TNode>(TNode product, ParsingLocalContext context)
+        private void ExecuteContinuations<TNode>(AlternativeKey key, TNode product, ParsingLocalContext context)
         {
             foreach (var action in this.successContinuations.OfType<SuccessContinuation<TNode>>())
-                action(product, context);
+                action(key, product, context);
         }
 
         /// <summary>
         /// Indicates that an alternative has failed.
         /// </summary>
-        /// <param name="alternative"></param>
+        /// <param name="alternativeIndex"></param>
         /// <param name="context"></param>
-        public void ProductionFailed(int alternative, ParsingLocalContext context)
+        public void ProductionFailed(int alternativeIndex, ParsingLocalContext context)
         {
-            if (this.isClosed)
+            if (this.IsClosed)
                 throw new Exception("Production is closed.");
 
             this.failureCount++;
-            this.alternatives[alternative].State = ProductAlternativeState.Failed;
-            this.alternatives[alternative].Product = null;
+            this.alternatives[alternativeIndex].State = ProductAlternativeState.Failed;
+            this.alternatives[alternativeIndex].Product = null;
+        }
+
+        /// <summary>
+        /// Creates slots for alternatives at any position of the alternatives list.
+        /// </summary>
+        /// <param name="indexOfNewSlot">Index to place the new slots at.</param>
+        /// <param name="numberOfSlotsToCreate">Number of slots to create.</param>
+        public void CreateAlternativeSlots(int indexOfNewSlot, int numberOfSlotsToCreate)
+        {
+            if (this.IsClosed)
+                throw new Exception("Production is closed.");
+
+            if (indexOfNewSlot < 0)
+                throw new Exception("Cannot create alternative slots. Initial index must be greater than or equal to zero.");
+
+            if (this.alternatives != null && this.alternatives[indexOfNewSlot].Order.IsDefined)
+                throw new Exception("Cannot create alternative slots. Indexes at the given position are already consolidated.");
+
+            if (this.alternatives != null && this.alternatives.Length < indexOfNewSlot)
+                throw new Exception(string.Format("Cannot create alternative slots. Initial index is out of bounds. Maximum value is {0}.", this.alternatives.Length));
+
+            this.capacity += numberOfSlotsToCreate;
+
+            this.alternatives = this.alternatives ?? new ProductAlternative[Math.Max(4, this.capacity)];
+
+            if (this.capacity > this.alternatives.Length)
+                Array.Resize(ref this.alternatives, this.alternatives.Length * 2);
+
+            var destination = indexOfNewSlot + numberOfSlotsToCreate;
+            var numberOfItemsToCopy = this.failureCount + this.successCount - destination;
+            Array.Copy(this.alternatives, indexOfNewSlot, this.alternatives, destination, numberOfItemsToCopy);
+            Array.Clear(this.alternatives, indexOfNewSlot, numberOfSlotsToCreate);
+        }
+
+        internal void ItemProduced(int p, ParsingLocalContext ctx, object gramdelNode)
+        {
+            throw new NotImplementedException();
         }
     }
 }

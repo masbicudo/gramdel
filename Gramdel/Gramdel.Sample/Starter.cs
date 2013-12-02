@@ -7,7 +7,7 @@ namespace Gramdel.Sample
         static void Main(string[] args)
         {
             var program = new Program();
-            Environment.ExitCode = program.Run(args, Output.Void);
+            Environment.ExitCode = program.Run(args, new BasicOutput(Environment.CurrentDirectory));
         }
     }
 }

@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Text;
 
 namespace Gramdel.Core
@@ -9,21 +10,22 @@ namespace Gramdel.Core
         {
             var prod = context.GetOrCreateProduction(this.Gramdel);
 
-            var gramdelNode = new GramdelNode();
+            var rules = new List<RuleNode>();
 
             // waiting for the first rule
             var prodRule = context.GetOrCreateProduction(this.Rule);
             SuccessContinuation<RuleNode> ruleProcessor = null;
-            ruleProcessor = (ruleNode, ctx) =>
+            ruleProcessor = (key, ruleNode, ctx) =>
                 {
                     // If there are no more rules, then we signal the production of a new Gramdel file.
                     if (ruleNode == null)
                     {
-                        prod.ItemProduced(0, ctx, gramdelNode);
+                        prod.ItemProduced(0, ctx, new GramdelNode { Rules = rules.ToArray() });
+                        prod.CloseProduction(ctx);
                     }
                     else
                     {
-                        gramdelNode.Rules.Add(ruleNode);
+                        rules.Add(ruleNode);
 
                         // waiting for another rule
                         var prodRule2 = ctx.GetOrCreateProduction(this.Rule);
@@ -41,23 +43,29 @@ namespace Gramdel.Core
 
             context.Position = prod.Origin;
 
-            // Sets the number of alternatives that can be produced by this producer method.
+            // Sets the minimum number of alternatives that will be analysed by this producer method.
             prod.SetAlternativeProductsCapacity(2);
-            const int ALT_0 = 0;
-            const int ALT_1 = 1;
 
-            {
-                var operands = new List<ExpressionNode>();
-                var productionConcat = context.GetOrCreateProduction(this.Concatenation);
-                FailureContinuation fail = ctx =>
-                    {
-
-                    };
-                productionConcat.FailWith(fail);
-                SuccessContinuation<ExpressionNode> cont1 = null;
-                cont1 = (node, ctx) =>
+            var operands = new List<ExpressionNode>();
+            var productionConcat = context.GetOrCreateProduction(this.Concatenation);
+            FailureContinuation fail = ctx =>
+                {
+                    prod.ProductionFailed(0, ctx);
+                    prod.CloseProduction(ctx);
+                };
+            productionConcat.FailWith(fail);
+            SuccessContinuation<ExpressionNode> cont1 = null;
+            cont1 = (key, node, ctx) =>
                 {
                     operands.Add(node);
+
+                    if (operands.Count >= 1)
+                        prod.CreateAlternativeSlots(0, 1);
+
+                    if (operands.Count > 1)
+                        prod.ItemProduced(1, ctx, new AlternationNode { Operands = operands.ToArray() });
+                    else if (operands.Count == 1)
+                        prod.ItemProduced(1, ctx, node);
 
                     ctx.Position += ctx.Reader.SkipSpaces(ctx.Code, ctx.Position);
                     if (ctx.Reader.TryReadToken(ctx.Code, ctx.Position, "|"))
@@ -67,80 +75,58 @@ namespace Gramdel.Core
 
                         // reading the second operator of the alternation
                         var productionConcat2 = context.GetOrCreateProduction(this.Concatenation);
+                        productionConcat2.FailWith(fail);
                         productionConcat2.ContinueWith(cont1);
                         productionConcat2.Execute(ctx);
                     }
-                    else if (operands.Count > 1)
-                    {
-                        prod.ItemProduced<ExpressionNode>(ALT_0, ctx, new AlternationNode { Operands = operands.ToArray() });
-                        prod.ProductionFailed(ALT_1, ctx);
-                    }
-                    else if (operands.Count == 1)
-                    {
-                        prod.ProductionFailed(ALT_0, ctx);
-                        prod.ItemProduced(ALT_1, ctx, node);
-                    }
-                    else
-                    {
-                        prod.ProductionFailed(ALT_0, ctx);
-                        prod.ProductionFailed(ALT_1, ctx);
-                    }
                 };
-                productionConcat.ContinueWith(cont1);
-                productionConcat.Execute(context);
-            }
+            productionConcat.ContinueWith(cont1);
+            productionConcat.Execute(context);
         }
 
         private void Concatenation(ParsingLocalContext context)
         {
-            var prod = context.GetOrCreateProduction(this.Concatenation);
+            var prod = context.GetOrCreateProduction(this.Alternation);
 
-            var origin = context.Position;
+            context.Position = prod.Origin;
 
-            context.Position = origin;
+            // Sets the minimum number of alternatives that will be analysed by this producer method.
+            prod.SetAlternativeProductsCapacity(1);
 
-            // Sets the number of alternatives that can be produced by this producer method.
-            prod.SetAlternativeProductsCapacity(2);
-            const int ALT_0 = 0;
-            const int ALT_1 = 1;
-
-            {
-                var operands = new List<ExpressionNode>();
-                var prodExpr1 = context.GetOrCreateProduction(this.ExpressionTerm);
-                SuccessContinuation<ExpressionNode> cont1 = null;
-                cont1 = (node, ctx) =>
+            var operands = new List<ExpressionNode>();
+            var productionConcat = context.GetOrCreateProduction(this.ExpressionTerm);
+            FailureContinuation fail = ctx =>
+                {
+                    prod.ProductionFailed(0, ctx);
+                    prod.CloseProduction(ctx);
+                };
+            productionConcat.FailWith(fail);
+            SuccessContinuation<ExpressionNode> cont1 = null;
+            cont1 = (key, node, ctx) =>
                 {
                     operands.Add(node);
 
+                    prod.CreateAlternativeSlots(0, 1);
+                    if (operands.Count > 1)
+                        prod.ItemProduced(1, ctx, new AlternationNode { Operands = operands.ToArray() });
+                    else if (operands.Count == 1)
+                        prod.ItemProduced(1, ctx, node);
+
+                    // spaces are concatenation operators in this case
                     var spaces = ctx.Reader.SkipSpaces(ctx.Code, ctx.Position);
                     if (spaces > 0)
                     {
                         ctx.Position += spaces;
 
                         // reading the second operator of the alternation
-                        var prodExpr2 = ctx.GetOrCreateProduction(this.ExpressionTerm);
-                        prodExpr2.ContinueWith(cont1);
-                        prodExpr2.Execute(ctx);
-                    }
-                    else if (operands.Count > 1)
-                    {
-                        prod.ItemProduced<ExpressionNode>(ALT_0, ctx, new ConcatenationNode { Operands = operands.ToArray() });
-                        prod.ProductionFailed(ALT_1, ctx);
-                    }
-                    else if (operands.Count == 1)
-                    {
-                        prod.ProductionFailed(ALT_0, ctx);
-                        prod.ItemProduced(ALT_1, ctx, node);
-                    }
-                    else
-                    {
-                        prod.ProductionFailed(ALT_0, ctx);
-                        prod.ProductionFailed(ALT_1, ctx);
+                        var productionConcat2 = context.GetOrCreateProduction(this.ExpressionTerm);
+                        productionConcat2.FailWith(fail);
+                        productionConcat2.ContinueWith(cont1);
+                        productionConcat2.Execute(ctx);
                     }
                 };
-                prodExpr1.ContinueWith(cont1);
-                prodExpr1.Execute(context);
-            }
+            productionConcat.ContinueWith(cont1);
+            productionConcat.Execute(context);
         }
 
         private void ExpressionTerm(ParsingLocalContext context)
@@ -151,10 +137,10 @@ namespace Gramdel.Core
             const int ALT_TOKEN = 0;
             const int ALT_NAME = 1;
 
-            bool isAltTokenFailed = false;
-
             // trying to read a token
             {
+                bool isAltTokenFailed = false;
+
                 context.Position = prod.Origin;
 
                 if (context.Reader.TryReadToken(context.Code, context.Position, "'"))
@@ -177,7 +163,7 @@ namespace Gramdel.Core
                     if (context.Reader.TryReadToken(context.Code, context.Position, "'"))
                     {
                         context.Position++;
-                        prod.ItemProduced<ExpressionNode>(ALT_TOKEN, context, new TokenNode { Token = b.ToString() });
+                        prod.ItemProduced(ALT_TOKEN, context, new TokenNode { Token = b.ToString() });
                     }
                     else
                         isAltTokenFailed = true;
@@ -197,7 +183,7 @@ namespace Gramdel.Core
                 if (name.Length > 0)
                 {
                     context.Position += name.Length;
-                    prod.ItemProduced<ExpressionNode>(ALT_NAME, context, new RuleReferenceNode { RuleName = name });
+                    prod.ItemProduced(ALT_NAME, context, new RuleReferenceNode { RuleName = name });
                 }
                 else
                 {
@@ -232,7 +218,7 @@ namespace Gramdel.Core
                         context.Position += context.Reader.SkipSpaces(context.Code, context.Position);
 
                         var prodAlt = context.GetOrCreateProduction(this.Alternation);
-                        prodAlt.ContinueWith<ExpressionNode>((expressionNode, ctx) =>
+                        prodAlt.ContinueWith<ExpressionNode>((key, expressionNode, ctx) =>
                             {
                                 ctx.Position += ctx.Reader.SkipSpaces(ctx.Code, ctx.Position);
 
@@ -251,42 +237,86 @@ namespace Gramdel.Core
 
         public class GramdelNode
         {
-            public GramdelNode()
-            {
-                this.Rules = new List<RuleNode>();
-            }
+            public RuleNode[] Rules { get; set; }
 
-            public List<RuleNode> Rules { get; set; }
+            public GramdelNode Clone()
+            {
+                return new GramdelNode
+                {
+                    Rules = CloningUtility.CloneArray(this.Rules),
+                };
+            }
         }
 
-        public class RuleNode
+        public class RuleNode : ICloneable<RuleNode>
         {
             public string Name { get; set; }
             public ExpressionNode Expression { get; set; }
+
+            public RuleNode Clone()
+            {
+                return new RuleNode
+                    {
+                        Name = this.Name,
+                        Expression = CloningUtility.CloneObject(this.Expression),
+                    };
+            }
         }
 
         public abstract class ExpressionNode
         {
         }
 
-        public class ConcatenationNode : ExpressionNode
+        public class ConcatenationNode : ExpressionNode, ICloneable<ConcatenationNode>
         {
             public ExpressionNode[] Operands { get; set; }
+
+            public ConcatenationNode Clone()
+            {
+                return new ConcatenationNode
+                    {
+                        Operands = CloningUtility.CloneArray(this.Operands),
+                    };
+            }
         }
 
-        public class AlternationNode : ExpressionNode
+        public class AlternationNode : ExpressionNode, ICloneable<AlternationNode>
         {
             public ExpressionNode[] Operands { get; set; }
+
+            public AlternationNode Clone()
+            {
+                return new AlternationNode
+                {
+                    Operands = CloningUtility.CloneArray(this.Operands),
+                };
+            }
         }
 
-        public class RuleReferenceNode : ExpressionNode
+        public class RuleReferenceNode : ExpressionNode, ICloneable<RuleReferenceNode>
         {
             public string RuleName { get; set; }
+
+            public RuleReferenceNode Clone()
+            {
+                return new RuleReferenceNode
+                {
+                    RuleName = this.RuleName,
+                };
+            }
         }
 
-        public class TokenNode : ExpressionNode
+        public class TokenNode : ExpressionNode, ICloneable<TokenNode>
         {
             public string Token { get; set; }
+
+            public TokenNode Clone()
+            {
+                return new TokenNode
+                {
+                    Token = this.Token,
+                };
+            }
         }
 
     }

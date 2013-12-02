@@ -44,14 +44,17 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Output.cs" />
+    <Compile Include="GramdelCompiler.cs" />
+    <Compile Include="GramdelCSharpCompiler.cs" />
+    <Compile Include="IOutput.cs" />
+    <Compile Include="BasicOutput.cs" />
     <Compile Include="Starter.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
-    <None Include="RecurionTest1.gramdel" />
+    <None Include="RecursionTest1.gramdel" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Gramdel.Core\Gramdel.Core.csproj">

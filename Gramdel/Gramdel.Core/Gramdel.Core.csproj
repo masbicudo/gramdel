@@ -39,12 +39,19 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="AlternativeCollection.cs" />
+    <Compile Include="AlternativeKey.cs" />
+    <Compile Include="CloningUtility.cs" />
     <Compile Include="Continuation.cs" />
     <Compile Include="GramdelParser.cs" />
     <Compile Include="GramdelNode.cs" />
+    <Compile Include="ICloneable.cs" />
+    <Compile Include="IContinuator.cs" />
+    <Compile Include="Ordinal.cs" />
     <Compile Include="PositionalKey.cs" />
     <Compile Include="ProdcutAlternative.cs" />
     <Compile Include="ProductAlternativeState.cs" />
+    <Compile Include="ProductState.cs" />
     <Compile Include="ReaderAction.cs" />
     <Compile Include="ParsingGlobalContext.cs" />
     <Compile Include="ParsingLocalContext.cs" />
